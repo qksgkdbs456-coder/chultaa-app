@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3포대 출타관리</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDK 모듈 로드 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDF0uMwfOHqLLWVQYAk8FPDHjnJPsMLceU",
+            authDomain: "chulta-583d7.firebaseapp.com",
+            projectId: "chulta-583d7",
+            storageBucket: "chulta-583d7.firebasestorage.app",
+            messagingSenderId: "975690657951",
+            appId: "1:975690657951:web:d6d43417a95885070372aa",
+            measurementId: "G-S1RXFC5GGW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.deleteDoc = deleteDoc;
+        window.doc = doc;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+        window.orderBy = orderBy;
+
+        window.initFirebaseRealtimeSync();
+    </script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- 상단 헤더 (모바일 한 줄 정렬) -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-3 py-2.5 flex justify-between items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight flex items-center gap-1.5 whitespace-nowrap">
+                <i class="fa-solid fa-calendar-days text-emerald-400"></i> 3포대 출타관리
+            </h1>
+            <div id="header-auth-area" class="flex items-center gap-1.5 shrink-0">
+                <button onclick="showPublicCalendar()" class="bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap">
+                    <i class="fa-solid fa-calendar-days"></i> 달력 보기
+                </button>
+                <div id="auth-btn-container" class="shrink-0">
+                    <button onclick="openAdminLoginModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                        <i class="fa-solid fa-lock"></i> 관리자 로그인
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <main class="flex-grow max-w-4xl w-full mx-auto px-3 sm:px-4 py-4 space-y-6">
+        
+        <!-- [1] 사용자 페이지 -->
+        <div id="user-page" class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-7">
+                <div class="border-b border-slate-100 pb-3 mb-5">
+                    <h2 class="text-xl sm:text-2xl font-bold text-slate-900">출타 신청서 작성</h2>
+                    <p class="text-xs sm:text-sm text-slate-500 mt-1">휴가, 외출, 외박, 면회 신청을 위한 양식입니다. 신청 즉시 실시간 반영됩니다.</p>
+                </div>
+                
+                <form id="leave-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">성명</label>
+                        <input type="text" id="soldier-name" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">군번</label>
+                        <input type="text" id="soldier-serial" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">계급</label>
+                        <select id="soldier-rank" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="">계급 선택</option>
+                            <option value="이병">이병</option>
+                            <option value="일병">일병</option>
+                            <option value="상병">상병</option>
+                            <option value="병장">병장</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">본인 연락처</label>
+                        <input type="tel" id="soldier-phone" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="010-0000-0000">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">출타 구분</label>
+                        <select id="leave-type" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none" onchange="onLeaveTypeChange()">
+                            <option value="">선택하세요</option>
+                            <option value="휴가">휴가</option>
+                            <option value="외출">외출</option>
+                            <option value="외박">외박</option>
+                            <option value="면회">면회</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">행선지</label>
+                        <input type="text" id="destination" required class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+
+                    <!-- 외박 숙소 정보 -->
+                    <div id="accommodation-section" class="hidden space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">숙소 정보</label>
+                        <input type="text" id="accommodation" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="호텔/펜션 이름 등">
+                    </div>
+
+                    <!-- 시작일 / 종료일 (길이 축소 디자인) -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1">
+                            <label class="block text-xs font-bold text-slate-700">시작일</label>
+                            <input type="date" id="start-date" required class="w-full max-w-[200px] px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="block text-xs font-bold text-slate-700">종료일</label>
+                            <input type="date" id="end-date" required class="w-full max-w-[200px] px-2.5 py-1.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- 출타 사유 -->
+                    <div id="reason-container" class="space-y-1">
+                        <label class="block text-xs font-bold text-slate-700">출타 사유</label>
+                        <textarea id="leave-reason" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <!-- 외출/외박 동행 형태 라디오 -->
+                    <div id="outing-sub-selector" class="hidden p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                        <label class="block text-xs font-bold text-slate-700">외출/외박 동행 형태</label>
+                        <div class="flex gap-4 text-xs font-semibold">
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="outing-sub-type" value="buddy" checked onchange="toggleOutingSubType()"> 전우조 동행
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="outing-sub-type" value="visitor" onchange="toggleOutingSubType()"> 면회객 동행
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 전우조 동행 섹션 -->
+                    <div id="buddy-section" class="hidden p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-700"><i class="fa-solid fa-users text-emerald-600"></i> 전우조 동행인원 입력</h3>
+                            <button type="button" onclick="addBuddyField()" class="bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-semibold">+ 추가</button>
+                        </div>
+                        <div id="buddy-list" class="space-y-2"></div>
+                    </div>
+
+                    <!-- 면회객 정보 섹션 -->
+                    <div id="visitor-section" class="hidden p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-slate-700"><i class="fa-solid fa-user-group text-emerald-600"></i> 면회객 정보 입력</h3>
+                            <button type="button" id="add-visitor-btn" onclick="addVisitorField()" class="bg-emerald-600 text-white px-2.5 py-1 rounded-lg text-xs font-semibold">+ 추가</button>
+                        </div>
+                        <div id="visitor-list" class="space-y-2"></div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition shadow text-sm">
+                        출타 신청서 제출 (실시간 반영)
+                    </button>
+                </form>
+            </div>
+
+            <!-- 월별 출타 현황 대시보드 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-pie text-emerald-600"></i> 월별 출타 현황
+                    </h3>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="changeDashboardMonth(-1)" class="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50">
+                            <i class="fa-solid fa-chevron-left"></i> 이전
+                        </button>
+                        <span id="dashboard-month-label" class="text-xs font-black text-slate-800 px-1.5 min-w-[80px] text-center">2026년 10월</span>
+                        <button onclick="changeDashboardMonth(1)" class="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50">
+                            다음 <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-600">총 출타율</span>
+                            <span id="dash-total-count" class="text-xs font-semibold text-slate-500">(0명 / 최대 20명)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2 mb-2">
+                            <span id="dash-total-percentage" class="text-2xl font-black text-slate-900">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                            <div id="dash-total-bar" class="bg-emerald-500 h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-xs font-bold text-slate-600">휴가 출타율</span>
+                            <span id="dash-vac-count" class="text-xs font-semibold text-slate-500">(0명 / 최대 15명)</span>
+                        </div>
+                        <div class="flex items-baseline gap-2 mb-2">
+                            <span id="dash-vac-percentage" class="text-2xl font-black text-slate-900">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                            <div id="dash-vac-bar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- [2] 관리자 전용 페이지 -->
+        <div id="admin-page" class="hidden space-y-5">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
+                <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-emerald-600"></i> 관리자 페이지
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">부대 정원 설정, 비밀번호 변경 및 카테고리별 독립 복사 양식을 관리합니다.</p>
+            </div>
+
+            <!-- 관리자 기능 전환 탭 버튼 -->
+            <div class="grid grid-cols-2 gap-2 bg-slate-200 p-1 rounded-xl">
+                <button id="admin-tab-settings-btn" onclick="switchAdminTab('settings')" class="py-2 rounded-lg text-xs sm:text-sm font-bold transition bg-white text-slate-900 shadow-sm">
+                    부대 정원 및 설정
+                </button>
+                <button id="admin-tab-copy-btn" onclick="switchAdminTab('copy')" class="py-2 rounded-lg text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900">
+                    출타자 정보 복사
+                </button>
+            </div>
+
+            <!-- TAB A: 부대 정원 및 설정 (비밀번호 변경 포함) -->
+            <div id="admin-subtab-settings" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6 space-y-5">
+                <div class="space-y-4">
+                    <h3 class="text-sm sm:text-base font-bold text-slate-900">부대 정원 및 출타율 한도 설정</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">총 부대원 수</label>
+                            <input type="number" id="set-troops" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">총 출타율 한도 (%)</label>
+                            <input type="number" id="set-total-rate" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">휴가 출타율 한도 (%)</label>
+                            <input type="number" id="set-vacation-rate" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <button onclick="saveAdminSettings()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition text-sm">
+                        설정 저장
+                    </button>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <div class="space-y-3">
+                    <h3 class="text-sm sm:text-base font-bold text-slate-900">관리자 비밀번호 변경</h3>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">새로운 비밀번호 입력</label>
+                        <input type="password" id="new-admin-pw" placeholder="새 비밀번호 입력" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <button onclick="changeAdminPassword()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl transition text-sm">
+                        비밀번호 변경
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB B: 출타자 정보 복사 -->
+            <div id="admin-subtab-copy" class="hidden space-y-4">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-3">
+                    <div class="flex justify-between items-center gap-2">
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="changeAdminCopyMonth(-1)" class="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50">
+                                <i class="fa-solid fa-chevron-left"></i> 이전
+                            </button>
+                            <span id="admin-copy-month-label" class="text-sm font-black text-slate-800 px-2 min-w-[100px] text-center">2026년 10월</span>
+                            <button onclick="changeAdminCopyMonth(1)" class="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50">
+                                다음 <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <button onclick="toggleAdminCopyAllMonths()" id="admin-copy-all-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+                            전체 기간
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-500">선택된 기간의 신청 내역이 아래 카테고리별 양식에 맞추어 자동으로 생성됩니다.</p>
+                </div>
+
+                <div class="grid grid-cols-4 gap-1.5 bg-slate-200 p-1 rounded-xl">
+                    <button id="cat-tab-vacation" onclick="switchCategoryCopyTab('vacation')" class="py-2 rounded-lg text-xs font-bold transition bg-white text-emerald-800 shadow-sm">
+                        휴가
+                    </button>
+                    <button id="cat-tab-outing" onclick="switchCategoryCopyTab('outing')" class="py-2 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+                        외출
+                    </button>
+                    <button id="cat-tab-stay" onclick="switchCategoryCopyTab('stay')" class="py-2 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+                        외박
+                    </button>
+                    <button id="cat-tab-visit" onclick="switchCategoryCopyTab('visit')" class="py-2 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900">
+                        면회
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h4 id="category-copy-title" class="text-sm font-bold text-slate-900">[휴가] 복사 양식</h4>
+                        <button onclick="copyCurrentCategoryText()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+                            <i class="fa-regular fa-copy"></i> 복사하기
+                        </button>
+                    </div>
+                    <textarea id="category-copy-textarea" readonly class="w-full h-64 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono leading-relaxed focus:outline-none" placeholder="해당 기간 내역 없음"></textarea>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 모달 컨테이너 -->
+    <div id="modal-container"></div>
+
+    <script>
+        let settings = { totalTroops: 100, totalRate: 20, vacationRate: 15 };
+        let adminPassword = '1234';
+        let leaves = [];
+        let isAdmin = false;
+
+        // 대시보드 월별 조회 상태
+        let dashYear = new Date().getFullYear();
+        let dashMonth = new Date().getMonth();
+
+        // 복사 탭 월별 조회 상태
+        let copyYear = new Date().getFullYear();
+        let copyMonth = new Date().getMonth();
+        let isCopyAllMonths = false;
+        let currentCategoryTab = 'vacation';
+
+        window.onload = function() {
+            initDates();
+            document.getElementById('set-troops').value = settings.totalTroops;
+            document.getElementById('set-total-rate').value = settings.totalRate;
+            document.getElementById('set-vacation-rate').value = settings.vacationRate;
+        };
+
+        function initDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('start-date').value = today;
+            document.getElementById('end-date').value = today;
+        }
+
+        window.initFirebaseRealtimeSync = function() {
+            const q = query(collection(window.db, "leaves"));
+            window.onSnapshot(q, (snapshot) => {
+                leaves = [];
+                snapshot.forEach((docSnap) => {
+                    leaves.push({ firebaseId: docSnap.id, ...docSnap.data() });
+                });
+                
+                recalculateCapacities();
+                updateDashboard();
+                if (isAdmin) {
+                    generateCategoryCopyTexts();
+                }
+            });
+        };
+
+        function openAdminLoginModal() {
+            let html = `
+                <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-2xl max-w-xs w-full p-5 space-y-4 shadow-xl">
+                        <h3 class="text-base font-bold text-slate-900 text-center"><i class="fa-solid fa-lock text-emerald-600"></i> 관리자 로그인</h3>
+                        <input type="password" id="admin-pw" placeholder="비밀번호" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-slate-900 focus:outline-none text-center">
+                        <div class="flex gap-2">
+                            <button onclick="closeModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-xl text-xs font-bold">취소</button>
+                            <button onclick="verifyAdminPassword()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-bold">로그인</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = html;
+        }
+
+        function verifyAdminPassword() {
+            const pw = document.getElementById('admin-pw').value;
+            if (pw === adminPassword) {
+                isAdmin = true;
+                closeModal();
+                switchToAdminPage();
+            } else {
+                alert("비밀번호가 올바르지 않습니다.");
+            }
+        }
+
+        function switchToAdminPage() {
+            document.getElementById('user-page').classList.add('hidden');
+            document.getElementById('admin-page').classList.remove('hidden');
+
+            document.getElementById('auth-btn-container').innerHTML = `
+                <button onclick="switchToUserPage()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap">
+                    <i class="fa-solid fa-house"></i> 사용자 페이지
+                </button>
+            `;
+
+            switchAdminTab('settings');
+            generateCategoryCopyTexts();
+        }
+
+        function switchToUserPage() {
+            isAdmin = false;
+            document.getElementById('admin-page').classList.add('hidden');
+            document.getElementById('user-page').classList.remove('hidden');
+
+            document.getElementById('auth-btn-container').innerHTML = `
+                <button onclick="openAdminLoginModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700 flex items-center gap-1 whitespace-nowrap">
+                    <i class="fa-solid fa-lock"></i> 관리자 로그인
+                </button>
+            `;
+        }
+
+        function switchAdminTab(tab) {
+            const btnSettings = document.getElementById('admin-tab-settings-btn');
+            const btnCopy = document.getElementById('admin-tab-copy-btn');
+            const subSettings = document.getElementById('admin-subtab-settings');
+            const subCopy = document.getElementById('admin-subtab-copy');
+
+            if (tab === 'settings') {
+                btnSettings.className = "py-2 rounded-lg text-xs sm:text-sm font-bold transition bg-white text-slate-900 shadow-sm";
+                btnCopy.className = "py-2 rounded-lg text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900";
+                subSettings.classList.remove('hidden');
+                subCopy.classList.add('hidden');
+            } else {
+                btnCopy.className = "py-2 rounded-lg text-xs sm:text-sm font-bold transition bg-white text-slate-900 shadow-sm";
+                btnSettings.className = "py-2 rounded-lg text-xs sm:text-sm font-bold transition text-slate-600 hover:text-slate-900";
+                subSettings.classList.add('hidden');
+                subCopy.classList.remove('hidden');
+                updateAdminCopyMonthDisplay();
+                generateCategoryCopyTexts();
+            }
+        }
+
+        function saveAdminSettings() {
+            settings.totalTroops = parseInt(document.getElementById('set-troops').value) || 100;
+            settings.totalRate = parseFloat(document.getElementById('set-total-rate').value) || 20;
+            settings.vacationRate = parseFloat(document.getElementById('set-vacation-rate').value) || 15;
+            recalculateCapacities();
+            updateDashboard();
+            alert("설정이 정상적으로 저장되었습니다.");
+        }
+
+        function changeAdminPassword() {
+            const newPw = document.getElementById('new-admin-pw').value;
+            if (!newPw) {
+                alert("새로운 비밀번호를 입력해주세요.");
+                return;
+            }
+            adminPassword = newPw;
+            document.getElementById('new-admin-pw').value = '';
+            alert("관리자 비밀번호가 성공적으로 변경되었습니다.");
+        }
+
+        // 월별 대시보드 상태 관리
+        function updateDashboardMonthDisplay() {
+            document.getElementById('dashboard-month-label').innerText = `${dashYear}년 ${dashMonth + 1}월`;
+        }
+
+        function changeDashboardMonth(diff) {
+            dashMonth += diff;
+            if (dashMonth > 11) { dashMonth = 0; dashYear++; }
+            else if (dashMonth < 0) { dashMonth = 11; dashYear--; }
+            updateDashboardMonthDisplay();
+            updateDashboard();
+        }
+
+        // 관리자 복사 탭 월별 관리
+        function updateAdminCopyMonthDisplay() {
+            const lbl = document.getElementById('admin-copy-month-label');
+            const allBtn = document.getElementById('admin-copy-all-btn');
+            if (isCopyAllMonths) {
+                lbl.innerText = "전체 기간";
+                allBtn.className = "bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold";
+            } else {
+                lbl.innerText = `${copyYear}년 ${copyMonth + 1}월`;
+                allBtn.className = "bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold";
+            }
+        }
+
+        function changeAdminCopyMonth(diff) {
+            isCopyAllMonths = false;
+            copyMonth += diff;
+            if (copyMonth > 11) { copyMonth = 0; copyYear++; }
+            else if (copyMonth < 0) { copyMonth = 11; copyYear--; }
+            updateAdminCopyMonthDisplay();
+            generateCategoryCopyTexts();
+        }
+
+        function toggleAdminCopyAllMonths() {
+            isCopyAllMonths = !isCopyAllMonths;
+            updateAdminCopyMonthDisplay();
+            generateCategoryCopyTexts();
+        }
+
+        function switchCategoryCopyTab(cat) {
+            currentCategoryTab = cat;
+            const tabs = ['vacation', 'outing', 'stay', 'visit'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`cat-tab-${t}`);
+                if (t === cat) {
+                    btn.className = "py-2 rounded-lg text-xs font-bold transition bg-white text-emerald-800 shadow-sm";
+                } else {
+                    btn.className = "py-2 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900";
+                }
+            });
+            generateCategoryCopyTexts();
+        }
+
+        function copyCurrentCategoryText() {
+            const ta = document.getElementById('category-copy-textarea');
+            if (!ta.value.trim()) {
+                alert("복사할 내용이 없습니다.");
+                return;
+            }
+            navigator.clipboard.writeText(ta.value).then(() => {
+                alert("클립보드에 복사되었습니다!");
+            });
+        }
+
+        function formatShortDate(dStr) {
+            if (!dStr) return '';
+            const parts = dStr.split('-');
+            if (parts.length < 3) return dStr;
+            const d = new Date(parts[0], parseInt(parts[1]) - 1, parts[2]);
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            return `${parseInt(parts[1])}.${parseInt(parts[2])}(${dayNames[d.getDay()]})`;
+        }
+
+        function formatSlashDate(dStr) {
+            if (!dStr) return '';
+            const parts = dStr.split('-');
+            if (parts.length < 3) return dStr;
+            const d = new Date(parts[0], parseInt(parts[1]) - 1, parts[2]);
+            const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+            return `${String(parts[1]).padStart(2, '0')}/${String(parts[2]).padStart(2, '0')}(${dayNames[d.getDay()]})`;
+        }
+
+        function formatDotDateRange(sStr, eStr) {
+            if (!sStr || !eStr) return '';
+            const sParts = sStr.split('-');
+            const eParts = eStr.split('-');
+            const s = `${parseInt(sParts[1])}.${parseInt(sParts[2])}`;
+            const e = `${parseInt(eParts[1])}.${parseInt(eParts[2])}`;
+            const d1 = new Date(sStr);
+            const d2 = new Date(eStr);
+            const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
+            return `${s}~${e} (${diffDays}일)`;
+        }
+
+        function generateCategoryCopyTexts() {
+            let filtered = leaves.filter(l => l.status === '승인');
+
+            if (!isCopyAllMonths) {
+                const ymPrefix = `${copyYear}-${String(copyMonth + 1).padStart(2, '0')}`;
+                filtered = filtered.filter(l => {
+                    const startYM = l.startDate ? l.startDate.substring(0, 7) : '';
+                    const endYM = l.endDate ? l.endDate.substring(0, 7) : '';
+                    return (startYM <= ymPrefix && endYM >= ymPrefix);
+                });
+            }
+
+            const titleElem = document.getElementById('category-copy-title');
+            const textareaElem = document.getElementById('category-copy-textarea');
+
+            let blocks = [];
+
+            if (currentCategoryTab === 'vacation') {
+                titleElem.innerText = "[휴가] 복사 양식";
+                const vLeaves = filtered.filter(l => l.type === '휴가');
+                blocks = vLeaves.map(l => {
+                    return `[휴가]\n${l.rank} ${l.name} ${l.serial}\n휴가일자: ${formatDotDateRange(l.startDate, l.endDate)}\n휴가종류: ${l.reason || ''}\n행선지: ${l.destination || ''}\n연락처: ${l.phone || ''}`;
+                });
+            } else if (currentCategoryTab === 'outing') {
+                titleElem.innerText = "[외출] 복사 양식";
+                const oLeaves = filtered.filter(l => l.type === '외출');
+                blocks = oLeaves.map(l => {
+                    const tag = l.reason ? `[${l.reason}]` : '[외출]';
+                    if (l.buddies && l.buddies.length > 0) {
+                        let lines = [tag];
+                        lines.push(`${l.rank} ${l.name} ${l.serial}`);
+                        l.buddies.forEach(b => lines.push(`${b.rank} ${b.name} ${b.serial}`));
+                        lines.push(`외출일자: ${formatShortDate(l.startDate)}`);
+                        lines.push(`행선지: ${l.destination || ''}`);
+                        lines.push(`${l.name}: ${l.phone || ''}`);
+                        l.buddies.forEach(b => lines.push(`${b.name}: ${b.phone || ''}`));
+                        return lines.join('\n');
+                    } else if (l.visitors && l.visitors.length > 0) {
+                        const v = l.visitors[0];
+                        return `${tag}\n${l.rank} ${l.name} ${l.serial}\n연락처 : ${l.phone || ''}\n외출일자: ${formatShortDate(l.startDate)}\n면회객 : ${v.name || ''}(${v.relation || ''})\n면회객 연락처 : ${v.phone || ''}\n행선지 : ${l.destination || ''}`;
+                    } else {
+                        return `${tag}\n${l.rank} ${l.name} ${l.serial}\n외출일자: ${formatShortDate(l.startDate)}\n행선지: ${l.destination || ''}\n연락처: ${l.phone || ''}`;
+                    }
+                });
+            } else if (currentCategoryTab === 'stay') {
+                titleElem.innerText = "[외박] 복사 양식";
+                const sLeaves = filtered.filter(l => l.type === '외박');
+                blocks = sLeaves.map(l => {
+                    const tag = l.reason ? `[${l.reason}]` : '[외박]';
+                    if (l.buddies && l.buddies.length > 0) {
+                        let lines = [tag];
+                        lines.push(`${l.rank} ${l.name} ${l.serial}`);
+                        l.buddies.forEach(b => lines.push(`${b.rank} ${b.name} ${b.serial}`));
+                        lines.push(`외박일자: ${formatShortDate(l.startDate)} ~ ${formatShortDate(l.endDate)}`);
+                        lines.push(`행선지: ${l.destination || ''}`);
+                        if (l.accommodation) lines.push(`숙소: ${l.accommodation}`);
+                        lines.push(`${l.name}: ${l.phone || ''}`);
+                        l.buddies.forEach(b => lines.push(`${b.name}: ${b.phone || ''}`));
+                        return lines.join('\n');
+                    } else if (l.visitors && l.visitors.length > 0) {
+                        const v = l.visitors[0];
+                        let lines = [tag];
+                        lines.push(`${l.rank} ${l.name} ${l.serial}`);
+                        lines.push(`연락처 : ${l.phone || ''}`);
+                        lines.push(`외박일자: ${formatShortDate(l.startDate)} ~ ${formatShortDate(l.endDate)}`);
+                        lines.push(`면회객 : ${v.name || ''}(${v.relation || ''})`);
+                        lines.push(`면회객 연락처 : ${v.phone || ''}`);
+                        lines.push(`행선지 : ${l.destination || ''}`);
+                        if (l.accommodation) lines.push(`숙소 : ${l.accommodation}`);
+                        return lines.join('\n');
+                    } else {
+                        return `${tag}\n${l.rank} ${l.name} ${l.serial}\n외박일자: ${formatShortDate(l.startDate)} ~ ${formatShortDate(l.endDate)}\n행선지: ${l.destination || ''}\n숙소: ${l.accommodation || ''}\n연락처: ${l.phone || ''}`;
+                    }
+                });
+            } else if (currentCategoryTab === 'visit') {
+                titleElem.innerText = "[면회] 복사 양식";
+                const vLeaves = filtered.filter(l => l.type === '면회');
+                blocks = vLeaves.map(l => {
+                    let v = (l.visitors && l.visitors.length > 0) ? l.visitors[0] : {};
+                    let vInfo = v.name ? `${v.name}${v.relation ? '(' + v.relation + ')' : ''}${v.phone ? '(' + v.phone + ')' : ''}` : '';
+                    return `[면회]\n${formatSlashDate(l.startDate)}\n면회자: ${l.rank} ${l.name}(${l.phone || ''})\n면회객: ${vInfo}\n주소: ${v.address || ''}\n면회객 생년월일: ${v.birth || ''}`;
+                });
+            }
+
+            textareaElem.value = blocks.length > 0 ? blocks.join('\n\n') : '';
+        }
+
+        // 달력 모달 및 날짜별 상세
+        let calYear = new Date().getFullYear();
+        let calMonth = new Date().getMonth();
+
+        function showPublicCalendar() {
+            let html = `
+                <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4">
+                    <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 space-y-3.5 shadow-2xl max-h-[92vh] flex flex-col">
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2.5">
+                            <h3 id="cal-title" class="text-base sm:text-lg font-bold text-slate-900">2026년 10월 출타 현황</h3>
+                            <div class="flex gap-1.5">
+                                <button onclick="changeCalMonth(-1)" class="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50"><i class="fa-solid fa-chevron-left"></i> 이전</button>
+                                <button onclick="changeCalMonth(1)" class="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50">다음 <i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-500 py-1 border-b border-slate-100">
+                            <div class="text-red-500">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="text-blue-500">토</div>
+                        </div>
+
+                        <div id="cal-grid" class="grid grid-cols-7 gap-1 flex-grow overflow-y-auto p-0.5"></div>
+
+                        <button onclick="closeModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2.5 rounded-xl text-xs sm:text-sm font-bold transition">닫기</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').innerHTML = html;
+            renderCalendarGrid();
+        }
+
+        function renderCalendarGrid() {
+            const title = document.getElementById('cal-title');
+            const grid = document.getElementById('cal-grid');
+            if (!title || !grid) return;
+
+            title.innerText = `${calYear}년 ${calMonth + 1}월 출타 현황`;
+            grid.innerHTML = '';
+
+            const firstDay = new Date(calYear, calMonth, 1).getDay();
+            const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                grid.innerHTML += `<div class="aspect-square rounded-lg bg-transparent"></div>`;
+            }
+
+            for (let d = 1; d <= lastDate; d++) {
+                const dStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                
+                const active = leaves.filter(l => l.startDate <= dStr && l.endDate >= dStr);
+                const approvedCount = active.filter(l => l.status === '승인').length;
+                const vacCount = active.filter(l => l.status === '승인' && l.type === '휴가').length;
+                const standbyCount = active.filter(l => l.status === '대기(초과)').length;
+
+                const cell = document.createElement('div');
+                cell.className = "aspect-square border border-slate-200/90 rounded-lg p-1 flex flex-col justify-between bg-white hover:border-emerald-500 hover:shadow-sm cursor-pointer transition";
+                cell.onclick = () => openDayDetailModal(dStr);
+
+                let summaryHtml = `
+                    <div class="space-y-0.5 text-center my-auto">
+                        <div class="text-[9px] sm:text-[10px] font-bold text-slate-700 bg-slate-100 rounded py-0.5 leading-none">
+                            총 ${approvedCount}명
+                        </div>
+                        <div class="text-[9px] sm:text-[10px] font-bold text-blue-600 bg-blue-50 rounded py-0.5 leading-none">
+                            휴가 ${vacCount}명
+                        </div>
+                        ${standbyCount > 0 ? `<div class="text-[8px] sm:text-[9px] font-bold text-red-500 leading-none">대기 ${standbyCount}명</div>` : ''}
+                    </div>
+                `;
+
+                cell.innerHTML = `
+                    <div class="text-[10px] sm:text-xs font-bold text-slate-600">${d}</div>
+                    ${summaryHtml}
+                    <div></div>
+                `;
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeCalMonth(diff) {
+            calMonth += diff;
+            if (calMonth > 11) { calMonth = 0; calYear++; }
+            else if (calMonth < 0) { calMonth = 11; calYear--; }
+            renderCalendarGrid();
+        }
+
+        function openDayDetailModal(dStr) {
+            const active = leaves.filter(l => l.startDate <= dStr && l.endDate >= dStr);
+            let listHtml = '';
+            if (active.length === 0) {
+                listHtml = '<p class="text-xs text-slate-400 text-center py-4">출타자가 없습니다.</p>';
+            } else {
+                listHtml = active.map(l => {
+                    const isStandby = l.status === '대기(초과)';
+                    return `
+                        <div class="p-2.5 rounded-xl border ${isStandby ? 'bg-red-50/70 border-red-200' : 'bg-slate-50 border-slate-200'} flex justify-between items-center text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold ${isStandby ? 'text-red-700' : 'text-slate-900'}">${l.rank} ${l.name}</span>
+                                <span class="text-slate-500 font-medium">(${l.type})</span>
+                                ${isStandby ? '<span class="bg-red-100 text-red-700 text-[10px] px-1.5 py-0.5 rounded font-bold">초과대기</span>' : ''}
+                            </div>
+                            <span class="text-[11px] text-slate-500">${l.startDate} ~ ${l.endDate}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            let html = `
+                <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+                    <div class="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl">
+                        <div class="border-b border-slate-100 pb-2">
+                            <h4 class="font-bold text-slate-900 text-sm">${dStr} 출타자 명단</h4>
+                        </div>
+                        <div class="max-h-60 overflow-y-auto space-y-2">
+                            ${listHtml}
+                        </div>
+                        <button onclick="closeSubModal()" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-bold">닫기</button>
+                    </div>
+                </div>
+            `;
+            const div = document.createElement('div');
+            div.id = 'sub-modal';
+            div.innerHTML = html;
+            document.body.appendChild(div);
+        }
+
+        function closeSubModal() {
+            const sm = document.getElementById('sub-modal');
+            if (sm) sm.remove();
+        }
+
+        function onLeaveTypeChange() {
+            const type = document.getElementById('leave-type').value;
+            const reasonContainer = document.getElementById('reason-container');
+            const reasonInput = document.getElementById('leave-reason');
+            const outingSubSelector = document.getElementById('outing-sub-selector');
+            const buddySection = document.getElementById('buddy-section');
+            const visitorSection = document.getElementById('visitor-section');
+            const accommodationSection = document.getElementById('accommodation-section');
+
+            reasonContainer.style.display = 'block';
+            reasonInput.placeholder = "";
+            outingSubSelector.style.display = 'none';
+            buddySection.style.display = 'none';
+            visitorSection.style.display = 'none';
+            accommodationSection.style.display = 'none';
+            document.getElementById('visitor-list').innerHTML = '';
+            document.getElementById('buddy-list').innerHTML = '';
+
+            if (type === '휴가') {
+                reasonInput.placeholder = "예: 연가 4일, 구직청원 2일";
+            } else if (type === '외출') {
+                reasonInput.placeholder = "예: 평일 전우조 외출";
+                outingSubSelector.style.display = 'block';
+                toggleOutingSubType();
+            } else if (type === '외박') {
+                reasonInput.placeholder = "예: 주말 면회 외박";
+                accommodationSection.style.display = 'block';
+                outingSubSelector.style.display = 'block';
+                toggleOutingSubType();
+            } else if (type === '면회') {
+                reasonContainer.style.display = 'none';
+                visitorSection.style.display = 'block';
+                addVisitorField();
+            }
+        }
+
+        function toggleOutingSubType() {
+            const subType = document.querySelector('input[name="outing-sub-type"]:checked').value;
+            const buddySection = document.getElementById('buddy-section');
+            const visitorSection = document.getElementById('visitor-section');
+
+            if (subType === 'buddy') {
+                buddySection.style.display = 'block';
+                visitorSection.style.display = 'none';
+                if (document.getElementById('buddy-list').children.length === 0) addBuddyField();
+            } else {
+                buddySection.style.display = 'none';
+                visitorSection.style.display = 'block';
+                if (document.getElementById('visitor-list').children.length === 0) addVisitorField();
+            }
+        }
+
+        function addBuddyField() {
+            const list = document.getElementById('buddy-list');
+            const div = document.createElement('div');
+            div.className = "space-y-2 bg-white p-2.5 rounded-xl border border-slate-200 text-xs";
+            div.innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <select class="buddy-rank w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white">
+                        <option value="이병">이병</option>
+                        <option value="일병">일병</option>
+                        <option value="상병">상병</option>
+                        <option value="병장" selected>병장</option>
+                    </select>
+                    <input type="text" class="buddy-name w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="성명">
+                </div>
+                <input type="text" class="buddy-serial w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="군번">
+                <input type="tel" class="buddy-phone w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="연락처">
+                <div class="flex justify-end">
+                    <button type="button" onclick="this.closest('.space-y-2').remove()" class="text-red-500 font-semibold text-[11px] flex items-center gap-1"><i class="fa-solid fa-trash"></i> 삭제</button>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+
+        function addVisitorField() {
+            const list = document.getElementById('visitor-list');
+            const div = document.createElement('div');
+            div.className = "space-y-2 bg-white p-2.5 rounded-xl border border-slate-200 text-xs";
+            const isPureVisit = document.getElementById('leave-type').value === '면회';
+
+            let innerHtml = `
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" class="visitor-name w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="면회객 성명">
+                    <input type="text" class="visitor-relation w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="관계 (예: 부모님, 여자친구)">
+                </div>
+                <input type="tel" class="visitor-phone w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="면회객 연락처">
+            `;
+
+            if (isPureVisit) {
+                innerHtml += `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input type="text" class="visitor-birth w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="생년월일 (예: 07.03.29)">
+                        <input type="text" class="visitor-address w-full px-2.5 py-1.5 border border-slate-300 rounded-lg" placeholder="주소">
+                    </div>
+                `;
+            }
+
+            innerHtml += `
+                <div class="flex justify-end">
+                    <button type="button" onclick="this.closest('.space-y-2').remove()" class="text-red-500 font-semibold text-[11px] flex items-center gap-1"><i class="fa-solid fa-trash"></i> 삭제</button>
+                </div>
+            `;
+
+            div.innerHTML = innerHtml;
+            list.appendChild(div);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const type = document.getElementById('leave-type').value;
+            const newLeave = {
+                id: Date.now(),
+                name: document.getElementById('soldier-name').value,
+                serial: document.getElementById('soldier-serial').value,
+                rank: document.getElementById('soldier-rank').value,
+                phone: document.getElementById('soldier-phone').value,
+                type: type,
+                destination: document.getElementById('destination').value,
+                accommodation: document.getElementById('accommodation').value,
+                startDate: document.getElementById('start-date').value,
+                endDate: document.getElementById('end-date').value,
+                reason: type === '면회' ? '면회' : document.getElementById('leave-reason').value,
+                status: '승인',
+                buddies: [],
+                visitors: []
+            };
+
+            if ((type === '외출' || type === '외박') && document.querySelector('input[name="outing-sub-type"]:checked').value === 'buddy') {
+                document.querySelectorAll('#buddy-list > div').forEach(el => {
+                    newLeave.buddies.push({
+                        rank: el.querySelector('.buddy-rank').value,
+                        name: el.querySelector('.buddy-name').value,
+                        serial: el.querySelector('.buddy-serial').value,
+                        phone: el.querySelector('.buddy-phone').value
+                    });
+                });
+            } else {
+                document.querySelectorAll('#visitor-list > div').forEach(el => {
+                    newLeave.visitors.push({
+                        name: el.querySelector('.visitor-name').value,
+                        relation: el.querySelector('.visitor-relation').value,
+                        phone: el.querySelector('.visitor-phone').value,
+                        birth: el.querySelector('.visitor-birth') ? el.querySelector('.visitor-birth').value : '',
+                        address: el.querySelector('.visitor-address') ? el.querySelector('.visitor-address').value : ''
+                    });
+                });
+            }
+
+            try {
+                await window.addDoc(window.collection(window.db, "leaves"), newLeave);
+                alert("출타 신청서가 정상적으로 제출 및 반영되었습니다.");
+                document.getElementById('leave-form').reset();
+                initDates();
+            } catch (error) {
+                console.error("데이터 전송 오류: ", error);
+                alert("신청 중 오류가 발생했습니다.");
+            }
+        }
+
+        function recalculateCapacities() {
+            leaves.forEach(l => l.status = '승인');
+            checkCapacityAndAutoQueue('휴가');
+            checkCapacityAndAutoQueue('기타');
+        }
+
+        function checkCapacityAndAutoQueue(groupType) {
+            let maxLimit = 0;
+            if (groupType === '휴가') {
+                maxLimit = Math.floor(settings.totalTroops * (settings.vacationRate / 100));
+            } else {
+                maxLimit = Math.floor(settings.totalTroops * (settings.totalRate / 100));
+            }
+
+            while (true) {
+                let activeByDate = {};
+                let approvedFiltered = leaves.filter(l => {
+                    if (groupType === '휴가') return l.type === '휴가' && l.status === '승인';
+                    return l.type !== '휴가' && l.status === '승인';
+                });
+
+                approvedFiltered.forEach(l => {
+                    let curr = new Date(l.startDate);
+                    let end = new Date(l.endDate);
+                    while (curr <= end) {
+                        let dStr = curr.toISOString().split('T')[0];
+                        activeByDate[dStr] = (activeByDate[dStr] || 0) + 1;
+                        curr.setDate(curr.getDate() + 1);
+                    }
+                });
+
+                let overflowDate = null;
+                for (let dStr in activeByDate) {
+                    if (activeByDate[dStr] > maxLimit) {
+                        overflowDate = dStr;
+                        break;
+                    }
+                }
+
+                if (!overflowDate) break;
+
+                let candidates = approvedFiltered.filter(l => l.endDate <= overflowDate);
+                if (candidates.length === 0) candidates = approvedFiltered;
+                if (candidates.length === 0) break;
+
+                candidates.sort((a, b) => {
+                    let aIsVac = (a.type === '휴가') ? 1 : 0;
+                    let bIsVac = (b.type === '휴가') ? 1 : 0;
+                    if (aIsVac !== bIsVac) return aIsVac - bIsVac;
+                    return new Date(b.endDate) - new Date(a.endDate);
+                });
+
+                let targetToQueue = candidates[0];
+                let found = leaves.find(l => l.id === targetToQueue.id);
+                if (found) {
+                    found.status = '대기(초과)';
+                } else {
+                    break;
+                }
+            }
+        }
+
+        function updateDashboard() {
+            updateDashboardMonthDisplay();
+
+            // 선택된 월(dashYear, dashMonth)에 해당하는 총 인원 및 휴가 인원 계산
+            const ymPrefix = `${dashYear}-${String(dashMonth + 1).padStart(2, '0')}`;
+            const monthApproved = leaves.filter(l => {
+                if (l.status !== '승인') return false;
+                const startYM = l.startDate ? l.startDate.substring(0, 7) : '';
+                const endYM = l.endDate ? l.endDate.substring(0, 7) : '';
+                return (startYM <= ymPrefix && endYM >= ymPrefix);
+            });
+
+            const totalCount = monthApproved.length;
+            const vacationCount = monthApproved.filter(l => l.type === '휴가').length;
+
+            const maxTotal = Math.floor(settings.totalTroops * (settings.totalRate / 100));
+            const maxVacation = Math.floor(settings.totalTroops * (settings.vacationRate / 100));
+
+            const totalPct = Math.min(100, Math.round((totalCount / (maxTotal || 1)) * 100) || 0);
+            const vacPct = Math.min(100, Math.round((vacationCount / (maxVacation || 1)) * 100) || 0);
+
+            document.getElementById('dash-total-percentage').innerText = totalPct + '%';
+            document.getElementById('dash-total-count').innerText = `(${totalCount}명 / 최대 ${maxTotal}명)`;
+            document.getElementById('dash-total-bar').style.width = totalPct + '%';
+
+            document.getElementById('dash-vac-percentage').innerText = vacPct + '%';
+            document.getElementById('dash-vac-count').innerText = `(${vacationCount}명 / 최대 ${maxVacation}명)`;
+            document.getElementById('dash-vac-bar').style.width = vacPct + '%';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-container').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
